@@ -1,0 +1,46 @@
+{
+  "name": "supfile",
+  "version": "1.0.0",
+  "description": "简洁、高可用的文件上传库",
+  "main": "./dist/supfile.cjs.js",
+  "module": "./dist/supfile.esm.js",
+  "directories": {
+    "test": "vitest"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "test": "vitest",
+    "build": "rollup -c"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ZGBX/supfile.git"
+  },
+  "keywords": [
+    "upload",
+    "chunk",
+    "file"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/ZGBX/supfile/issues"
+  },
+  "homepage": "https://github.com/ZGBX/supfile#readme",
+  "dependencies": {
+    "spark-md5": "^3.0.2"
+  },
+  "devDependencies": {
+    "@rollup/plugin-terser": "^0.4.4",
+    "@types/spark-md5": "^3.0.5",
+    "prettier": "^3.6.2",
+    "rollup": "^4.53.2",
+    "rollup-plugin-copy": "^3.5.0",
+    "rollup-plugin-typescript2": "^0.36.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.9"
+  }
+}
