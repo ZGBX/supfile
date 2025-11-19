@@ -2,6 +2,7 @@ import {ChunkSplitor} from './chunkSplitor';
 import {Chunk} from './type';
 import {EventEmitter} from '../event/eventEmitter';
 import {calculateChunkHash} from './index';
+import {EventNames} from '../event/eventNames';
 
 /**
  * 基于主线程时间切片的分片器
@@ -9,7 +10,7 @@ import {calculateChunkHash} from './index';
  */
 
 export class TimeSliceSplitor extends ChunkSplitor {
-  calcHash(chunks: Chunk[], emitter: EventEmitter<'chunks'>): void {
+  calcHash(chunks: Chunk[], emitter: EventEmitter<typeof EventNames.CHUNK_HASHED>): void {
     let index = 0;
     const batchSize = 2;
     const processBatch = () => {
@@ -27,7 +28,7 @@ export class TimeSliceSplitor extends ChunkSplitor {
           return chunk;
         }),
       ).then(doneChunks => {
-        emitter.emit('chunks', doneChunks);
+        emitter.emit(EventNames.CHUNK_HASHED, doneChunks);
         if (index < chunks.length) {
           // 利用 requestIdleCallback 或 setTimeout 继续处理下一批
           if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {

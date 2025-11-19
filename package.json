@@ -5,7 +5,7 @@
   "main": "./dist/supfile.cjs.js",
   "module": "./dist/supfile.esm.js",
   "directories": {
-    "test": "vitest"
+    "spark-md5": "^3.0.2"
   },
   "files": [
     "dist"

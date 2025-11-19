@@ -16,6 +16,11 @@ export class EventEmitter<T extends string> {
     this.events.get(event)?.delete(listener);
   }
 
+  // 移除所有监听器
+  offAll(event: T): void {
+    this.events.delete(event);
+  }
+
   // 订阅一次事件
   once(event: T, listener: (...args: any[]) => void): void {
     const onceListener = (...args: any[]) => {

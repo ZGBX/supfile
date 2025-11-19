@@ -7,8 +7,7 @@
 import {EventEmitter} from '../event/eventEmitter';
 import {Chunk} from './type';
 import {createChunk} from '.';
-
-export type ChunkSplitorEvents = 'chunks' | 'wholeHash' | 'drain';
+import {ChunkSplitorEvent, EventNames} from '../event/eventNames';
 
 let SparkMD5Instance: any;
 if (typeof window !== 'undefined' && (window as any).SparkMD5) {
@@ -20,7 +19,7 @@ if (typeof window !== 'undefined' && (window as any).SparkMD5) {
   SparkMD5Instance = require('spark-md5');
 }
 
-export abstract class ChunkSplitor extends EventEmitter<ChunkSplitorEvents> {
+export abstract class ChunkSplitor extends EventEmitter<ChunkSplitorEvent> {
   protected chunkSize: number; // 分片大小，单位字节
   protected file: File; // 待分片的文件
   protected hash?: string; // 整个文件的hash值
@@ -42,27 +41,27 @@ export abstract class ChunkSplitor extends EventEmitter<ChunkSplitorEvents> {
       return;
     }
     this.hasSplited = true;
-    const emitter = new EventEmitter<'chunks'>();
+    const emitter = new EventEmitter<typeof EventNames.CHUNK_HASHED>();
     const chunksHanlder = (chunks: Chunk[]) => {
-      this.emit('chunks', chunks);
+      this.emit(EventNames.CHUNK_HASHED, chunks);
       chunks.forEach(chunk => {
         this.spark.append(chunk.hash);
       });
       this.handleChunkCount += chunks.length;
       if (this.handleChunkCount === this.chunks.length) {
         // 计算完成
-        emitter.off('chunks', chunksHanlder);
-        this.emit('wholeHash', this.spark.end());
+        emitter.off(EventNames.CHUNK_HASHED, chunksHanlder);
+        this.emit(EventNames.WHOLE_HASH, this.spark.end());
         this.spark.destroy();
-        this.emit('drain');
+        this.emit(EventNames.SPLIT_DRAIN);
       }
     };
-    emitter.on('chunks', chunksHanlder);
+    emitter.on(EventNames.CHUNK_HASHED, chunksHanlder);
     this.calcHash(this.chunks, emitter);
   }
 
   // 计算每一个分片的hash
-  abstract calcHash(chunks: Chunk[], emitter: EventEmitter<'chunks'>): void;
+  abstract calcHash(chunks: Chunk[], emitter: EventEmitter<typeof EventNames.CHUNK_HASHED>): void;
 
   // 分片完成后一些需要销毁的工作
   abstract dispose(): void;

@@ -1,15 +1,6 @@
 import {EventEmitter} from '../event/eventEmitter';
 import {Task} from './task';
-
-// 任务队列事件类型
-export const TaskQueueEventName = {
-  START: 'start',
-  PAUSE: 'pause',
-  DRAIN: 'drain',
-} as const;
-
-// 自动推导事件类型
-export type TaskQueueEvent = (typeof TaskQueueEventName)[keyof typeof TaskQueueEventName];
+import {TaskQueueEvent, EventNames} from '../event/eventNames';
 
 // 任务队列状态枚举
 export enum TaskQueueStatus {
@@ -52,12 +43,12 @@ export class TaskQueue extends EventEmitter<TaskQueueEvent> {
 
     if (this.tasks.size === 0) {
       // 当前已无任务
-      this.emit(TaskQueueEventName.DRAIN);
+      this.emit(EventNames.TASK_DRAIN);
       return;
     }
     // 设置状态为运行中
     this.status = TaskQueueStatus.RUNNING;
-    this.emit(TaskQueueEventName.START);
+    this.emit(EventNames.TASK_START);
     // 执行任务
     this.runNext();
   }
@@ -82,7 +73,7 @@ export class TaskQueue extends EventEmitter<TaskQueueEvent> {
     if (!task) {
       // 当前已无任务
       this.status = TaskQueueStatus.PAUSED; // 设置状态为暂停中
-      this.emit(TaskQueueEventName.DRAIN);
+      this.emit(EventNames.TASK_DRAIN);
       return;
     }
     this.currentCount++; // 增加当前执行任务数
@@ -100,6 +91,13 @@ export class TaskQueue extends EventEmitter<TaskQueueEvent> {
   // 暂停任务
   pause() {
     this.status = TaskQueueStatus.PAUSED;
-    this.emit(TaskQueueEventName.PAUSE);
+    this.emit(EventNames.TASK_PAUSE);
+  }
+
+  // 清空所有任务
+  clear() {
+    this.tasks.clear();
+    this.currentCount = 0;
+    this.status = TaskQueueStatus.PAUSED;
   }
 }
