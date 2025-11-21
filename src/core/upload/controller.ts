@@ -21,11 +21,14 @@ export class UploadController extends EventEmitter<UploadControllerEvent> {
   private splitStrategy: ChunkSplitor; // 分片策略
   private taskQueue: TaskQueue; // 任务队列
   private file: File; // 待上传文件
+  private fileHash: string = ''; // 整体文件hash值
   private token: string = ''; // 文件上传唯一标识
   private totalChunks: number = 0; // 总分片数
   private finishedChunks: number = 0; // 已完成分片数
+  private failedChunks: number = 0; // 失败分片数
   private callbacks: UploadCallbacks = {}; // 上传回调
   private isPaused = false; // 是否已暂停上传
+  protected drainListenerBound: boolean = false; // 是否已绑定 drain 监听
 
   constructor(options: {
     file: File;
@@ -53,6 +56,19 @@ export class UploadController extends EventEmitter<UploadControllerEvent> {
       this.splitStrategy.on(EventNames.CHUNK_HASHED, this.handleChunks.bind(this));
       this.splitStrategy.on(EventNames.WHOLE_HASH, this.handleWholeHash.bind(this));
 
+      // 订阅分片状态变更事件，判断是否全部分片处理完毕
+      this.on(EventNames.CHUNK_STATUS_CHANGE, () => {
+        if (this.finishedChunks + this.failedChunks === this.totalChunks) {
+          // 全部分片已处理，决定是否合并或结束
+          if (this.finishedChunks === this.totalChunks) {
+            // 全部成功，合并
+            this.finalMergeOrPatch(this.fileHash);
+          } else {
+            // 有失败，结束
+            this.emitEnd(`${this.failedChunks} 个分片上传失败`);
+          }
+        }
+      });
       // 启动分片
       this.splitStrategy.split();
     } catch (error) {
@@ -87,6 +103,10 @@ export class UploadController extends EventEmitter<UploadControllerEvent> {
 
   // 分片事件处理
   private handleChunks(chunks: Chunk[]) {
+    console.log(
+      'sdk: handleChunks',
+      chunks.map(c => c.index),
+    );
     chunks.forEach(chunk => {
       this.taskQueue.addAndStart(new Task(this.uploadChunk.bind(this), chunk));
     });
@@ -95,26 +115,34 @@ export class UploadController extends EventEmitter<UploadControllerEvent> {
   // 分片上传任务
   async uploadChunk(chunk: Chunk) {
     try {
-      // hash校验，避免重复上传
       const resp = await this.requestStrategy.patchHash(this.token, chunk.hash, 'chunk');
       if (resp.hasFile) {
-        this.updateProgress();
+        this.updateProgress(true);
         return;
       }
-      // 分片上传
       await this.requestStrategy.uploadChunk(chunk);
-      this.updateProgress();
+      this.updateProgress(true);
     } catch (error) {
+      console.log('sdk: chunk failed', chunk.index, error);
+      this.updateProgress(false);
       this.emitError(error);
     }
   }
 
-  // 更新上传进度
-  private updateProgress() {
-    this.finishedChunks++;
-    const percent = Math.round((this.finishedChunks / this.totalChunks) * 100);
-    this.emit(EventNames.UPLOAD_PROGRESS, percent);
-    this.callbacks.onProgress?.(percent);
+  // 更新上传进度：统一处理分片状态变更，成功计进度，失败只计数和发布事件
+  private updateProgress(success: boolean) {
+    if (success) {
+      this.finishedChunks++;
+      const percent = Math.round((this.finishedChunks / this.totalChunks) * 100);
+      this.emit(EventNames.UPLOAD_PROGRESS, percent);
+      this.callbacks.onProgress?.(percent);
+    } else {
+      this.failedChunks++;
+    }
+    // 发布分片状态变更事件
+    if (this.finishedChunks + this.failedChunks == this.totalChunks) {
+      this.emit(EventNames.CHUNK_STATUS_CHANGE);
+    }
   }
   // 上传完成事件处理
   private emitEnd(url: string) {
@@ -128,45 +156,84 @@ export class UploadController extends EventEmitter<UploadControllerEvent> {
   }
 
   // 整体hash事件处理
-  private async handleWholeHash(hash: string) {
-    // 如果分片还没有全部上传完成，等待任务队列完成
-    if (this.finishedChunks < this.totalChunks) {
-      this.taskQueue.once(EventNames.TASK_DRAIN, () => {
-        this.handleWholeHash(hash);
-      });
-      return;
-    }
+  // private async handleWholeHash(hash: string) {
+  //   // 如果分片还没有全部上传完成，等待任务队列完成
+  //   if (this.failedChunks + this.finishedChunks < this.totalChunks) {
+  //     this.taskQueue.once(EventNames.TASK_DRAIN, () => {
+  //       this.handleWholeHash(hash);
+  //     });
+  //     return;
+  //   } else if (this.failedChunks > 0) {
+  //     // 有分片上传失败，触发错误事件
+  //     // this.emitError(new Error(`${this.failedChunks} 个分片上传失败`));
+  //     this.emitEnd(`${this.failedChunks} 个分片上传失败`);
+  //     return;
+  //   }
 
+  //   // if (this.finishedChunks < this.totalChunks) {
+  //   //   this.taskQueue.once(EventNames.TASK_DRAIN, () => {
+  //   //     this.handleWholeHash(hash);
+  //   //   });
+  //   //   return;
+  //   // }
+
+  //   try {
+  //     // hash校验
+  //     const resp = await this.requestStrategy.patchHash(this.token, hash, 'file');
+  //     // file 类型
+  //     if ('url' in resp && resp.hasFile) {
+  //       this.emitEnd(resp.url as string);
+  //       return;
+  //     }
+  //     // chunk 类型
+  //     if ('rest' in resp && Array.isArray(resp.rest) && resp.rest.length > 0) {
+  //       // 需要补传缺失分片
+  //       const missingChunks = resp.rest.map((idx: number) => this.splitStrategy.getChunks()[idx]);
+  //       missingChunks.forEach((chunk: Chunk) => {
+  //         this.taskQueue.addAndStart(new Task(this.uploadChunk.bind(this), chunk));
+  //       });
+
+  //       // 先解绑之前的 drain 监听
+  //       const drainListener = async () => {
+  //         try {
+  //           const url = await this.requestStrategy.mergeFile(this.token);
+  //           this.emitEnd(url);
+  //         } catch (err) {
+  //           this.emitError(err);
+  //         }
+  //       };
+  //       this.taskQueue.off(EventNames.TASK_DRAIN, drainListener);
+
+  //       this.taskQueue.once(EventNames.TASK_DRAIN, drainListener);
+  //     } else {
+  //       // 没有缺失分片，直接合并
+  //       const url = await this.requestStrategy.mergeFile(this.token);
+  //       this.emitEnd(url);
+  //     }
+  //   } catch (error) {
+  //     this.emitError(error);
+  //   }
+  // }
+
+  private async handleWholeHash(hash: string) {
+    // 分片 hash 计算完成后，仅负责最终合并和补传逻辑
+    this.fileHash = hash;
+  }
+  private async finalMergeOrPatch(hash: string) {
     try {
-      // hash校验
       const resp = await this.requestStrategy.patchHash(this.token, hash, 'file');
-      // file 类型
       if ('url' in resp && resp.hasFile) {
         this.emitEnd(resp.url as string);
         return;
       }
-      // chunk 类型
       if ('rest' in resp && Array.isArray(resp.rest) && resp.rest.length > 0) {
         // 需要补传缺失分片
         const missingChunks = resp.rest.map((idx: number) => this.splitStrategy.getChunks()[idx]);
         missingChunks.forEach((chunk: Chunk) => {
           this.taskQueue.addAndStart(new Task(this.uploadChunk.bind(this), chunk));
         });
-
-        // 先解绑之前的 drain 监听
-        const drainListener = async () => {
-          try {
-            const url = await this.requestStrategy.mergeFile(this.token);
-            this.emitEnd(url);
-          } catch (err) {
-            this.emitError(err);
-          }
-        };
-        this.taskQueue.off(EventNames.TASK_DRAIN, drainListener);
-
-        this.taskQueue.once(EventNames.TASK_DRAIN, drainListener);
+        // drain 事件已绑定，不再递归
       } else {
-        // 没有缺失分片，直接合并
         const url = await this.requestStrategy.mergeFile(this.token);
         this.emitEnd(url);
       }
