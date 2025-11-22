@@ -1,6 +1,6 @@
 {
   "name": "supfile",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "简洁、高可用的文件上传库",
   "main": "./dist/supfile.cjs.js",
   "module": "./dist/supfile.esm.js",
@@ -12,7 +12,12 @@
   ],
   "scripts": {
     "test": "vitest",
-    "build": "rollup -c"
+    "build": "rollup -c",
+    "clean": "rm -rf dist node_modules/.rpt2_cache",
+    "ci:build": "npm ci && npm run build",
+    "pack": "npm pack",
+    "publish:local": "npm run pack && echo 'local package created'",
+    "release": "npm version patch && git push --follow-tags && npm publish --access public"
   },
   "repository": {
     "type": "git",
