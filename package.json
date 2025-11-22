@@ -1,6 +1,6 @@
 {
   "name": "supfile",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "简洁、高可用的文件上传库",
   "main": "./dist/supfile.cjs.js",
   "module": "./dist/supfile.esm.js",
