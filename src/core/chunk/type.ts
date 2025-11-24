@@ -5,3 +5,10 @@ export interface Chunk {
   hash: string; // 分片的hash值
   index: number; // 分片的索引
 }
+
+// 支持的分片策略
+export const SplitStrategyTypes = {
+  SIMPLE: 'simple',
+  MULTI: 'mutil',
+} as const;
+export type SplitStrategyType = (typeof SplitStrategyTypes)[keyof typeof SplitStrategyTypes];

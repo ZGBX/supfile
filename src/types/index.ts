@@ -1,31 +1,25 @@
+import {RequestStrategy} from '../core/upload/requestStrategy';
+import {SplitStrategyType} from '../core/chunk/type';
 /**
- * 上传文件的参数选项。
- * @interface UploadOptions
- * @property {File | Blob} file - 要上传的文件或 Blob 对象。
- * @property {string} url - 文件上传的目标 URL。
- * @property {Record<string, string>} [headers] - 可选，上传请求附加的请求头。
- * @property {(percentage: number) => void} [onProgress] - 可选，上传进度回调，参数为百分比。
- * @property {(response: any) => void} [onSuccess] - 可选，上传成功回调，参数为响应数据。
- * @property {(error: any) => void} [onError] - 可选，上传失败回调，参数为错误信息。
+ * UploadController 构造与初始化选项（与 controller.ts 对齐）
  */
-export interface UploadOptions {
-  file: File | Blob;
-  url: string;
-  headers?: Record<string, string>;
-  onProgress?: (percentage: number) => void;
-  onSuccess?: (response: any) => void;
-  onError?: (error: any) => void;
+export interface UploadControllerOptions {
+  file: File;
+  requestStrategy: RequestStrategy;
+  splitStrategyType?: SplitStrategyType;
+  // 单片大小（字节），默认在 controller 中为 5 * 1024 * 1024
+  chunkSize?: number;
+  // 并发上传数，默认 4
+  concurrency?: number;
+  callbacks?: UploadCallbacks;
 }
 
 /**
- * 上传结果。
- * @interface UploadResult
- * @property {boolean} success - 是否上传成功。
- * @property {any} [data] - 可选，成功时返回的数据。
- * @property {string} [error] - 可选，失败时的错误信息。
+ * 上传回调集合（供 UploadController 使用）
  */
-export interface UploadResult {
-  success: boolean;
-  data?: any;
-  error?: string;
+export interface UploadCallbacks {
+  onProgress?: (percent: number) => void;
+  onEnd?: (url: string) => void;
+  onError?: (err: any) => void;
+  onChunkHashed?: (index: number, hash: string) => void;
 }

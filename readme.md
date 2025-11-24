@@ -56,3 +56,21 @@ onError: err => console.error('error:', err)
 controller.start();
 
 ```
+
+## 参数说明
+
+| 参数              |                类型 | 必填 |   默认   | 说明                                                                          |
+| ----------------- | ------------------: | :--: | :------: | ----------------------------------------------------------------------------- |
+| file              |        File \| Blob |  是  |    —     | 要上传的文件或二进制对象。                                                    |
+| concurrency       |              number |  否  |    4     | 并发上传分片数。                                                              |
+| chunkSize         |              number |  否  |   5MB    | 分片大小（字节）。示例常用值：1 _ 1024 _ 1024（1MB）或 1024 \* 512（512KB）。 |
+| requestStrategy   |     RequestStrategy |  是  |    —     | 自定义请求策略实例，需实现 createFile / patchHash / uploadChunk / mergeFile。 |
+| splitStrategyType | 'simple' \| 'mutil' |  否  | 'simple' | 分片策略类型：'simple'（单线程）或 'mutil'（使用 Worker 并行计算 hash）。     |
+| callbacks         |              Object |  否  |    {}    | 回调集合（见下）。                                                            |
+
+常用 callbacks 字段：
+
+- onProgress(percent: number) — 上传进度（0-100）
+- onEnd(url: string) — 上传完成并返回文件 URL
+- onError(err: any) — 上传出错回调
+- onChunkHashed(index: number, hash: string) — 单片 hash 计算完成

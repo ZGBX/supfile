@@ -5,12 +5,11 @@ import {Task} from '../task/task';
 import {TaskQueue} from '../task/taskQueue';
 import {RequestStrategy} from './requestStrategy';
 import {UploadControllerEvent, EventNames} from '../event/eventNames';
-
-type UploadCallbacks = {
-  onProgress?: (percent: number) => void;
-  onEnd?: (url: string) => void;
-  onError?: (error: any) => void;
-};
+import {onNetworkStatusChange} from '../../utils/netWork';
+import {SimpleSplitor} from '../chunk/simpleSplitor';
+import {MutilThreadSplitor} from '../chunk/mutilThreadSplitor';
+import {SplitStrategyType, SplitStrategyTypes} from '../chunk/type';
+import {UploadControllerOptions, UploadCallbacks} from '../../types/index';
 
 /**
  * 分片上传控制器
@@ -19,6 +18,8 @@ type UploadCallbacks = {
 export class UploadController extends EventEmitter<UploadControllerEvent> {
   private requestStrategy: RequestStrategy; // 请求策略
   private splitStrategy: ChunkSplitor; // 分片策略
+  private chunkSize: number; // 分片大小
+  private splitStrategyType: SplitStrategyType; // 分片策略类型
   private taskQueue: TaskQueue; // 任务队列
   private file: File; // 待上传文件
   private fileHash: string = ''; // 整体文件hash值
@@ -30,19 +31,21 @@ export class UploadController extends EventEmitter<UploadControllerEvent> {
   private isPaused = false; // 是否已暂停上传
   protected drainListenerBound: boolean = false; // 是否已绑定 drain 监听
 
-  constructor(options: {
-    file: File;
-    requestStrategy: RequestStrategy;
-    splitStrategy: ChunkSplitor;
-    concurrency?: number;
-    callbacks?: UploadCallbacks;
-  }) {
+  constructor(options: UploadControllerOptions) {
     super();
     this.file = options.file;
     this.requestStrategy = options.requestStrategy;
-    this.splitStrategy = options.splitStrategy;
+
+    this.splitStrategyType = options.splitStrategyType ?? SplitStrategyTypes.SIMPLE;
+    this.chunkSize = options.chunkSize || 5 * 1024 * 1024; // 默认5MB
+    if (this.splitStrategyType === SplitStrategyTypes.MULTI) {
+      this.splitStrategy = new MutilThreadSplitor(this.file, this.chunkSize);
+    } else {
+      this.splitStrategy = new SimpleSplitor(this.file, this.chunkSize);
+    }
+
     this.taskQueue = new TaskQueue(options.concurrency || 4);
-    this.totalChunks = options.splitStrategy.getChunks().length;
+    this.totalChunks = this.splitStrategy.getChunks().length;
     this.callbacks = options.callbacks || {};
   }
 
@@ -71,6 +74,16 @@ export class UploadController extends EventEmitter<UploadControllerEvent> {
       });
       // 启动分片
       this.splitStrategy.split();
+
+      // 监听网络，offline时暂停
+      onNetworkStatusChange((online: boolean) => {
+        if (!online) {
+          // 网络离线，暂停上传
+          this.pause();
+          this.emitError(new Error('网络已断开，上传已暂停'));
+          return;
+        }
+      });
     } catch (error) {
       this.emitError(error);
     }

@@ -100,4 +100,9 @@ export class TaskQueue extends EventEmitter<TaskQueueEvent> {
     this.currentCount = 0;
     this.status = TaskQueueStatus.PAUSED;
   }
+
+  // 设置最大并发数
+  setConcurrency(concurrency: number) {
+    this.concurrency = concurrency;
+  }
 }
