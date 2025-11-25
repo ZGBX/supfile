@@ -9,6 +9,8 @@
 - 支持多线程分片计算（Web Worker）
 - 可自定义请求策略
 - 支持自定义上传策略：只需实现 RequestStrategy 接口的四个方法，即可对接任意后端或业务流程，方法内部逻辑完全可自定义。
+- 支持秒传
+- 支持断点续传
 
 ## 快速开始
 
@@ -73,4 +75,4 @@ controller.start();
 - onProgress(percent: number) — 上传进度（0-100）
 - onEnd(url: string) — 上传完成并返回文件 URL
 - onError(err: any) — 上传出错回调
-- onChunkHashed(index: number, hash: string) — 单片 hash 计算完成
+- onChunkHashed( hash: string) — hash 计算完成

@@ -21,5 +21,5 @@ export interface UploadCallbacks {
   onProgress?: (percent: number) => void;
   onEnd?: (url: string) => void;
   onError?: (err: any) => void;
-  onChunkHashed?: (index: number, hash: string) => void;
+  onChunkHashed?: (hash: string) => void;
 }
